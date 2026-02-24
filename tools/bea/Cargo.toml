@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+    "bea-sdk",
+    "bea-host",
+    "plugins/journal",
+    "plugins/track",
+    "plugins/agile",
+]
