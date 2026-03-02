@@ -1,0 +1,38 @@
+{
+  "name": "beu",
+  "description": "Lightweight session memory CLI for agent workflows. Track journal entries, artifacts, tasks, state, ideas, and debug investigations across sessions.",
+  "version": "0.1.0",
+  "author": {
+    "name": "cyuan"
+  },
+  "keywords": [
+    "session-memory",
+    "agent-workflow",
+    "task-tracking",
+    "persistent-state"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "beu progress"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "beu progress"
+          }
+        ]
+      }
+    ]
+  }
+}

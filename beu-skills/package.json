@@ -1,0 +1,31 @@
+{
+    "name": "@shuozeli/beu-skills",
+    "version": "0.1.0",
+    "description": "Agent skill rules for beu - persistent session-memory CLI",
+    "bin": {
+        "beu-skills": "./bin/install.js"
+    },
+    "files": [
+        "bin/",
+        "skills/"
+    ],
+    "publishConfig": {
+        "registry": "https://registry.npmjs.org",
+        "access": "public"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Shuozeli/beu.git",
+        "directory": "beu-skills"
+    },
+    "keywords": [
+        "beu",
+        "agent",
+        "skills",
+        "rules"
+    ],
+    "license": "UNLICENSED",
+    "engines": {
+        "node": ">=18"
+    }
+}
