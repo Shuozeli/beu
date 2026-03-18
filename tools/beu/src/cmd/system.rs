@@ -10,7 +10,7 @@ use super::state;
 // Init / Version
 // ---------------------------------------------------------------------------
 
-pub fn cmd_init(root: &Path, quiet: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn cmd_init(root: &Path, quiet: bool, all_agents: bool) -> Result<(), Box<dyn std::error::Error>> {
     let beu_dir = root.join(".beu");
     if beu_dir.exists() {
         return Err(format!(".beu directory already exists at {}", beu_dir.display()).into());
@@ -31,7 +31,7 @@ pub fn cmd_init(root: &Path, quiet: bool) -> Result<(), Box<dyn std::error::Erro
     // Download skill rule files via npx. Non-fatal: init succeeds even if the
     // package isn't available (e.g. offline or not yet published). The user can
     // run `beu update-rules` later once the package is reachable.
-    let skills_result = crate::rules::install_skills(root, false);
+    let skills_result = crate::rules::install_skills(root, all_agents);
 
     if !quiet {
         println!("Initialized .beu at {}", beu_dir.display());

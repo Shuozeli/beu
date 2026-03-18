@@ -37,7 +37,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Initialize a new .beu project directory.
-    Init,
+    Init {
+        /// Install skills for all known agents (default: Claude Code + .agents only).
+        #[arg(long)]
+        all_agents: bool,
+    },
 
     /// Journal: agent interaction ledger.
     Journal {
@@ -471,9 +475,9 @@ fn main() {
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
-        Commands::Init => {
+        Commands::Init { all_agents } => {
             let root = std::env::current_dir()?;
-            cmd::system::cmd_init(&root, cli.quiet)
+            cmd::system::cmd_init(&root, cli.quiet, all_agents)
         }
         Commands::Project { action } => match action {
             ProjectAction::List { name } => cmd::project::cmd_list(name.as_deref()),
@@ -863,7 +867,7 @@ fn run_with_project(
             cmd::system::cmd_reset(&mut store, &module, force, quiet)
         }
         // Init, Project, Version, Test are handled in run() before reaching here.
-        Commands::Init
+        Commands::Init { .. }
         | Commands::Project { .. }
         | Commands::Version
         | Commands::UpdateRules
