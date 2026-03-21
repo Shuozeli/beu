@@ -22,7 +22,8 @@ pub fn install_skills(
         .arg("skills")
         .arg("add")
         .arg(SKILLS_REPO)
-        .arg("--skill").arg("*")
+        .arg("--skill")
+        .arg("*")
         .arg("--copy")
         .arg("-y")
         .current_dir(root);

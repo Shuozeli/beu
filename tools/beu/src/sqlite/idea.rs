@@ -171,12 +171,9 @@ impl IdeaStore for SqliteStore {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let tx = self.conn.transaction()?;
 
-        let exists = {
-            let exists = tx
-                .prepare("SELECT 1 FROM ideas WHERE id = ?1 AND project_id = ?2")?
-                .exists(rusqlite::params![id, self.project_id])?;
-            exists
-        };
+        let exists = tx
+            .prepare("SELECT 1 FROM ideas WHERE id = ?1 AND project_id = ?2")?
+            .exists(rusqlite::params![id, self.project_id])?;
         if !exists {
             return Err(format!("idea #{id} not found").into());
         }

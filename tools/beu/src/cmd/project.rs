@@ -237,14 +237,7 @@ pub fn cmd_status(name_filter: Option<&str>) -> Result<(), Box<dyn std::error::E
         match SqliteStore::open_readonly(&p.beu_dir, "default") {
             Ok(store) => {
                 if let Some(size) = store.db_size() {
-                    let size_str = if size >= 1024 * 1024 {
-                        format!("{:.1}MB", size as f64 / (1024.0 * 1024.0))
-                    } else if size >= 1024 {
-                        format!("{:.1}KB", size as f64 / 1024.0)
-                    } else {
-                        format!("{size}B")
-                    };
-                    println!("  data:    {size_str}");
+                    println!("  data:    {}", super::system::format_byte_size(size));
                 }
             }
             Err(e) => {

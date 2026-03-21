@@ -90,12 +90,9 @@ impl StateStore for SqliteStore {
     fn remove(&mut self, key: &str) -> Result<bool, Box<dyn std::error::Error>> {
         let tx = self.conn.transaction()?;
 
-        let exists = {
-            let exists = tx
-                .prepare("SELECT 1 FROM state_entries WHERE key = ?1 AND project_id = ?2")?
-                .exists(rusqlite::params![key, self.project_id])?;
-            exists
-        };
+        let exists = tx
+            .prepare("SELECT 1 FROM state_entries WHERE key = ?1 AND project_id = ?2")?
+            .exists(rusqlite::params![key, self.project_id])?;
         if !exists {
             tx.commit()?;
             return Ok(false);

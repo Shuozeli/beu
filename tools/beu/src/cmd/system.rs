@@ -7,10 +7,29 @@ use crate::store::{ArtifactStore, DebugStore, EventLogStore, IdeaStore, StateSto
 use super::state;
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Format a byte count as a human-readable string (e.g., "1.2KB", "3.4MB").
+pub fn format_byte_size(size: u64) -> String {
+    if size >= 1024 * 1024 {
+        format!("{:.1}MB", size as f64 / (1024.0 * 1024.0))
+    } else if size >= 1024 {
+        format!("{:.1}KB", size as f64 / 1024.0)
+    } else {
+        format!("{size}B")
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Init / Version
 // ---------------------------------------------------------------------------
 
-pub fn cmd_init(root: &Path, quiet: bool, all_agents: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn cmd_init(
+    root: &Path,
+    quiet: bool,
+    all_agents: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let beu_dir = root.join(".beu");
     if beu_dir.exists() {
         return Err(format!(".beu directory already exists at {}", beu_dir.display()).into());
@@ -109,14 +128,7 @@ pub fn cmd_status(
     println!("  modules: {}", config.enabled_modules().join(", "));
 
     if let Some(size) = store.db_size() {
-        let size_str = if size >= 1024 * 1024 {
-            format!("{:.1}MB", size as f64 / (1024.0 * 1024.0))
-        } else if size >= 1024 {
-            format!("{:.1}KB", size as f64 / 1024.0)
-        } else {
-            format!("{size}B")
-        };
-        println!("  data:     {size_str}");
+        println!("  data:     {}", format_byte_size(size));
     } else {
         println!("  data:     (empty)");
     }

@@ -173,7 +173,6 @@ pub trait IdeaStore {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct Session {
     pub id: String,
     pub started_at: String,
@@ -182,7 +181,6 @@ pub struct Session {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct JournalEntry {
     pub created_at: String,
     pub message: String,
@@ -316,7 +314,6 @@ pub trait DebugStore {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct Event {
     pub id: i64,
     pub timestamp: String,

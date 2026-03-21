@@ -49,12 +49,9 @@ impl DebugStore for SqliteStore {
 
     fn slug_exists(&mut self, slug: &str) -> Result<bool, Box<dyn std::error::Error>> {
         let tx = self.conn.transaction()?;
-        let exists = {
-            let exists = tx
-                .prepare("SELECT 1 FROM debug_sessions WHERE slug = ?1 AND project_id = ?2")?
-                .exists(rusqlite::params![slug, self.project_id])?;
-            exists
-        };
+        let exists = tx
+            .prepare("SELECT 1 FROM debug_sessions WHERE slug = ?1 AND project_id = ?2")?
+            .exists(rusqlite::params![slug, self.project_id])?;
         tx.commit()?;
         Ok(exists)
     }

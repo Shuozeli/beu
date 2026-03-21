@@ -24,7 +24,7 @@ pub(super) fn create_tables(tx: &rusqlite::Transaction) -> Result<(), Box<dyn st
 
 fn migrate_add_test_status(tx: &rusqlite::Transaction) -> Result<(), Box<dyn std::error::Error>> {
     let has_column: bool = {
-        let mut stmt = tx.prepare("PRAGMA table_info([tasks])").unwrap();
+        let mut stmt = tx.prepare("PRAGMA table_info([tasks])")?;
         let columns: Vec<String> = stmt
             .query_map([], |row| row.get::<_, String>(1))?
             .collect::<Result<Vec<_>, _>>()?;

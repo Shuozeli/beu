@@ -100,12 +100,9 @@ impl ArtifactStore for SqliteStore {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let tx = self.conn.transaction()?;
 
-        let exists = {
-            let exists = tx
-                .prepare("SELECT 1 FROM artifacts WHERE name = ?1 AND project_id = ?2")?
-                .exists(rusqlite::params![name, self.project_id])?;
-            exists
-        };
+        let exists = tx
+            .prepare("SELECT 1 FROM artifacts WHERE name = ?1 AND project_id = ?2")?
+            .exists(rusqlite::params![name, self.project_id])?;
         if !exists {
             return Err(format!("artifact '{name}' not found").into());
         }
@@ -152,12 +149,9 @@ impl ArtifactStore for SqliteStore {
     fn remove_artifact(&mut self, name: &str) -> Result<bool, Box<dyn std::error::Error>> {
         let tx = self.conn.transaction()?;
 
-        let exists = {
-            let exists = tx
-                .prepare("SELECT 1 FROM artifacts WHERE name = ?1 AND project_id = ?2")?
-                .exists(rusqlite::params![name, self.project_id])?;
-            exists
-        };
+        let exists = tx
+            .prepare("SELECT 1 FROM artifacts WHERE name = ?1 AND project_id = ?2")?
+            .exists(rusqlite::params![name, self.project_id])?;
         if !exists {
             tx.commit()?;
             return Ok(false);
@@ -182,12 +176,9 @@ impl ArtifactStore for SqliteStore {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let tx = self.conn.transaction()?;
 
-        let exists = {
-            let exists = tx
-                .prepare("SELECT 1 FROM artifacts WHERE name = ?1 AND project_id = ?2")?
-                .exists(rusqlite::params![name, self.project_id])?;
-            exists
-        };
+        let exists = tx
+            .prepare("SELECT 1 FROM artifacts WHERE name = ?1 AND project_id = ?2")?
+            .exists(rusqlite::params![name, self.project_id])?;
         if !exists {
             return Err(format!("artifact '{name}' not found").into());
         }
