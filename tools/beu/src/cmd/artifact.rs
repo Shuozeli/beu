@@ -1,11 +1,21 @@
 use crate::store::ArtifactStore;
 
+const VALID_TYPES: &[&str] = &["doc", "codelab", "test", "config", "spec", "changelog"];
+const VALID_STATUSES: &[&str] = &["pending", "in-progress", "review", "done"];
+
 pub fn cmd_add(
     store: &mut impl ArtifactStore,
     name: &str,
     artifact_type: &str,
     description: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if !VALID_TYPES.contains(&artifact_type) {
+        return Err(format!(
+            "invalid artifact type '{artifact_type}' (valid: {})",
+            VALID_TYPES.join(", ")
+        )
+        .into());
+    }
     if store.get_artifact(name)?.is_some() {
         return Err(format!("artifact '{name}' already exists").into());
     }
@@ -20,11 +30,10 @@ pub fn cmd_status(
     name: &str,
     new_status: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let valid = ["pending", "in-progress", "review", "done"];
-    if !valid.contains(&new_status) {
+    if !VALID_STATUSES.contains(&new_status) {
         return Err(format!(
             "invalid status '{new_status}' (valid: {})",
-            valid.join(", ")
+            VALID_STATUSES.join(", ")
         )
         .into());
     }

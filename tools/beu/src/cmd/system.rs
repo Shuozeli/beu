@@ -275,8 +275,11 @@ pub fn cmd_reset(
 
 pub fn cmd_health(
     store: &mut SqliteStore,
-    _repair: bool,
+    repair: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if repair {
+        eprintln!("warning: --repair is not yet implemented");
+    }
     let mut issues = 0;
 
     // Check data directory.
@@ -490,6 +493,8 @@ pub fn cmd_check(
 // Event logging helper
 // ---------------------------------------------------------------------------
 
+/// Log a command event for telemetry. Errors are intentionally non-fatal:
+/// event logging is best-effort and must not mask the primary command result.
 pub fn log_event(
     store: &mut impl EventLogStore,
     module: &str,
@@ -497,7 +502,9 @@ pub fn log_event(
     status: &str,
     duration_ms: i64,
 ) {
-    let _ = store.log_event(module, command, "", status, duration_ms);
+    if let Err(e) = store.log_event(module, command, "", status, duration_ms) {
+        eprintln!("warning: failed to log event: {e}");
+    }
 }
 
 // ---------------------------------------------------------------------------

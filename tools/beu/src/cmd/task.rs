@@ -1,16 +1,26 @@
 use crate::store::TaskStore;
 
+const VALID_STATUSES: &[&str] = &["open", "in-progress", "done", "blocked"];
+const VALID_PRIORITIES: &[&str] = &["low", "medium", "high", "critical"];
+const VALID_TEST_STATUSES: &[&str] = &[
+    "planned",
+    "designed",
+    "implemented",
+    "tested",
+    "darklaunched",
+    "launched",
+];
+
 pub fn cmd_add(
     store: &mut impl TaskStore,
     title: &str,
     priority: &str,
     tag: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let valid_priority = ["low", "medium", "high", "critical"];
-    if !valid_priority.contains(&priority) {
+    if !VALID_PRIORITIES.contains(&priority) {
         return Err(format!(
             "invalid priority '{priority}' (valid: {})",
-            valid_priority.join(", ")
+            VALID_PRIORITIES.join(", ")
         )
         .into());
     }
@@ -70,15 +80,17 @@ pub fn cmd_update(
     }
 
     if let Some(s) = new_status {
-        let valid = ["open", "in-progress", "done", "blocked"];
-        if !valid.contains(&s) {
-            return Err(format!("invalid status '{s}' (valid: {})", valid.join(", ")).into());
+        if !VALID_STATUSES.contains(&s) {
+            return Err(
+                format!("invalid status '{s}' (valid: {})", VALID_STATUSES.join(", ")).into(),
+            );
         }
     }
     if let Some(p) = new_priority {
-        let valid = ["low", "medium", "high", "critical"];
-        if !valid.contains(&p) {
-            return Err(format!("invalid priority '{p}' (valid: {})", valid.join(", ")).into());
+        if !VALID_PRIORITIES.contains(&p) {
+            return Err(
+                format!("invalid priority '{p}' (valid: {})", VALID_PRIORITIES.join(", ")).into(),
+            );
         }
     }
 
@@ -127,18 +139,10 @@ pub fn cmd_test_status(
     id: i64,
     new_test_status: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let valid = [
-        "planned",
-        "designed",
-        "implemented",
-        "tested",
-        "darklaunched",
-        "launched",
-    ];
-    if !valid.contains(&new_test_status) {
+    if !VALID_TEST_STATUSES.contains(&new_test_status) {
         return Err(format!(
             "invalid test status '{new_test_status}' (valid: {})",
-            valid.join(", ")
+            VALID_TEST_STATUSES.join(", ")
         )
         .into());
     }

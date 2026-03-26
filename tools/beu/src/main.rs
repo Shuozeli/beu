@@ -493,19 +493,50 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             cmd::system::cmd_update_rules(&root, cli.quiet)
         }
         Commands::Test { action } => {
-            let beu_dir = resolve_beu_dir(cli.beu_dir.clone())?;
+            let beu_dir = resolve_beu_dir(cli.beu_dir)?;
             let cfg = config::load(&beu_dir)?;
             match action {
                 TestAction::Patterns => cmd::testing::cmd_patterns(&cfg),
             }
         }
-        ref _cmd => {
-            let beu_dir = resolve_beu_dir(cli.beu_dir.clone())?;
+        // All remaining commands require a resolved project.
+        Commands::Journal { .. }
+        | Commands::Artifact { .. }
+        | Commands::Task { .. }
+        | Commands::State { .. }
+        | Commands::Idea { .. }
+        | Commands::Debug { .. }
+        | Commands::Pause { .. }
+        | Commands::Resume
+        | Commands::Progress
+        | Commands::Health { .. }
+        | Commands::Status
+        | Commands::Check
+        | Commands::Events { .. }
+        | Commands::Export { .. }
+        | Commands::Import { .. }
+        | Commands::Reset { .. } => {
+            let beu_dir = resolve_beu_dir(cli.beu_dir)?;
             let cfg = config::load(&beu_dir)?;
             let project_id = cfg.resolve_project(cli.project.as_deref())?;
             run_with_project(cli.command, &beu_dir, &cfg, &project_id, cli.quiet)
         }
     }
+}
+
+/// Execute a command, measure its duration, and log the event.
+fn run_timed(
+    store: &mut sqlite::SqliteStore,
+    module: &str,
+    cmd_name: &str,
+    f: impl FnOnce(&mut sqlite::SqliteStore) -> Result<(), Box<dyn std::error::Error>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let start = std::time::Instant::now();
+    let result = f(store);
+    let duration_ms = start.elapsed().as_millis() as i64;
+    let status = if result.is_ok() { "ok" } else { "error" };
+    cmd::system::log_event(store, module, cmd_name, status, duration_ms);
+    result
 }
 
 fn run_with_project(
@@ -515,355 +546,257 @@ fn run_with_project(
     project_id: &str,
     quiet: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
+
     match command {
         Commands::Journal { action } => {
             cfg.require_module("journal")?;
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
-            let (cmd_name, result) = match action {
-                JournalAction::Open => ("open", cmd::journal::cmd_open(&mut store)),
+            let cmd_name = match &action {
+                JournalAction::Open => "open",
+                JournalAction::Log { .. } => "log",
+                JournalAction::Note { .. } => "note",
+                JournalAction::Summary => "summary",
+                JournalAction::Close => "close",
+            };
+            run_timed(&mut store, "journal", cmd_name, |s| match action {
+                JournalAction::Open => cmd::journal::cmd_open(s),
                 JournalAction::Log { message } => {
-                    let msg = message.join(" ");
-                    if msg.is_empty() {
-                        return Err("usage: beu journal log <message>".into());
-                    }
-                    ("log", cmd::journal::cmd_log(&mut store, &msg))
+                    let msg = require_message(message, "beu journal log <message>")?;
+                    cmd::journal::cmd_log(s, &msg)
                 }
                 JournalAction::Note { tag, message } => {
-                    let msg = message.join(" ");
-                    if msg.is_empty() {
-                        return Err("usage: beu journal note --tag <tag> <message>".into());
-                    }
-                    ("note", cmd::journal::cmd_note(&mut store, &tag, &msg))
+                    let msg =
+                        require_message(message, "beu journal note --tag <tag> <message>")?;
+                    cmd::journal::cmd_note(s, &tag, &msg)
                 }
-                JournalAction::Summary => ("summary", cmd::journal::cmd_summary(&mut store)),
-                JournalAction::Close => ("close", cmd::journal::cmd_close(&mut store)),
-            };
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "journal", cmd_name, status, duration_ms);
-            result
+                JournalAction::Summary => cmd::journal::cmd_summary(s),
+                JournalAction::Close => cmd::journal::cmd_close(s),
+            })
         }
         Commands::Artifact { action } => {
             cfg.require_module("artifact")?;
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
-            let (cmd_name, result) = match action {
+            let cmd_name = match &action {
+                ArtifactAction::Add { .. } => "add",
+                ArtifactAction::Status { .. } => "status",
+                ArtifactAction::List { .. } => "list",
+                ArtifactAction::Show { .. } => "show",
+                ArtifactAction::Describe { .. } => "describe",
+                ArtifactAction::Remove { .. } => "remove",
+                ArtifactAction::Changelog { .. } => "changelog",
+                ArtifactAction::History { .. } => "history",
+            };
+            run_timed(&mut store, "artifact", cmd_name, |s| match action {
                 ArtifactAction::Add {
                     name,
                     r#type,
                     description,
-                } => (
-                    "add",
-                    cmd::artifact::cmd_add(&mut store, &name, &r#type, description.as_deref()),
-                ),
-                ArtifactAction::Status { name, status } => (
-                    "status",
-                    cmd::artifact::cmd_status(&mut store, &name, &status),
-                ),
-                ArtifactAction::List { filter } => (
-                    "list",
-                    cmd::artifact::cmd_list(&mut store, filter.as_deref()),
-                ),
-                ArtifactAction::Show { name } => {
-                    ("show", cmd::artifact::cmd_show(&mut store, &name))
+                } => cmd::artifact::cmd_add(s, &name, &r#type, description.as_deref()),
+                ArtifactAction::Status { name, status } => {
+                    cmd::artifact::cmd_status(s, &name, &status)
                 }
+                ArtifactAction::List { filter } => {
+                    cmd::artifact::cmd_list(s, filter.as_deref())
+                }
+                ArtifactAction::Show { name } => cmd::artifact::cmd_show(s, &name),
                 ArtifactAction::Describe { name, description } => {
-                    let desc = description.join(" ");
-                    if desc.is_empty() {
-                        return Err("usage: beu artifact describe <name> <description>".into());
-                    }
-                    (
-                        "describe",
-                        cmd::artifact::cmd_describe(&mut store, &name, &desc),
-                    )
+                    let desc = require_message(
+                        description,
+                        "beu artifact describe <name> <description>",
+                    )?;
+                    cmd::artifact::cmd_describe(s, &name, &desc)
                 }
-                ArtifactAction::Remove { name } => {
-                    ("remove", cmd::artifact::cmd_remove(&mut store, &name))
-                }
+                ArtifactAction::Remove { name } => cmd::artifact::cmd_remove(s, &name),
                 ArtifactAction::Changelog { name, message } => {
-                    let msg = message.join(" ");
-                    if msg.is_empty() {
-                        return Err("usage: beu artifact changelog <name> <message>".into());
-                    }
-                    (
-                        "changelog",
-                        cmd::artifact::cmd_changelog(&mut store, &name, &msg),
-                    )
+                    let msg =
+                        require_message(message, "beu artifact changelog <name> <message>")?;
+                    cmd::artifact::cmd_changelog(s, &name, &msg)
                 }
-                ArtifactAction::History { name } => {
-                    ("history", cmd::artifact::cmd_history(&mut store, &name))
-                }
-            };
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "artifact", cmd_name, status, duration_ms);
-            result
+                ArtifactAction::History { name } => cmd::artifact::cmd_history(s, &name),
+            })
         }
         Commands::Task { action } => {
             cfg.require_module("task")?;
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
-            let (cmd_name, result) = match action {
+            let cmd_name = match &action {
+                TaskAction::Add { .. } => "add",
+                TaskAction::List { .. } => "list",
+                TaskAction::Update { .. } => "update",
+                TaskAction::Done { .. } => "done",
+                TaskAction::Show { .. } => "show",
+                TaskAction::TestStatus { .. } => "test-status",
+                TaskAction::Sprint => "sprint",
+            };
+            run_timed(&mut store, "task", cmd_name, |s| match action {
                 TaskAction::Add {
                     title,
                     priority,
                     tag,
                 } => {
-                    let title_str = title.join(" ");
-                    if title_str.is_empty() {
-                        return Err("usage: beu task add <title>".into());
-                    }
-                    (
-                        "add",
-                        cmd::task::cmd_add(&mut store, &title_str, &priority, tag.as_deref()),
-                    )
+                    let title_str = require_message(title, "beu task add <title>")?;
+                    cmd::task::cmd_add(s, &title_str, &priority, tag.as_deref())
                 }
                 TaskAction::List {
                     status,
                     tag,
                     test_status,
-                } => (
-                    "list",
-                    cmd::task::cmd_list(
-                        &mut store,
-                        status.as_deref(),
-                        tag.as_deref(),
-                        test_status.as_deref(),
-                    ),
+                } => cmd::task::cmd_list(
+                    s,
+                    status.as_deref(),
+                    tag.as_deref(),
+                    test_status.as_deref(),
                 ),
-
                 TaskAction::Update {
                     id,
                     status,
                     priority,
                     tag,
-                } => (
-                    "update",
-                    cmd::task::cmd_update(
-                        &mut store,
-                        id,
-                        status.as_deref(),
-                        priority.as_deref(),
-                        tag.as_deref(),
-                    ),
+                } => cmd::task::cmd_update(
+                    s,
+                    id,
+                    status.as_deref(),
+                    priority.as_deref(),
+                    tag.as_deref(),
                 ),
-                TaskAction::Done { id } => ("done", cmd::task::cmd_done(&mut store, id)),
-                TaskAction::Show { id } => ("show", cmd::task::cmd_show(&mut store, id)),
-                TaskAction::TestStatus { id, status } => (
-                    "test-status",
-                    cmd::task::cmd_test_status(&mut store, id, &status),
-                ),
-                TaskAction::Sprint => ("sprint", cmd::task::cmd_sprint(&mut store)),
-            };
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "task", cmd_name, status, duration_ms);
-            result
+                TaskAction::Done { id } => cmd::task::cmd_done(s, id),
+                TaskAction::Show { id } => cmd::task::cmd_show(s, id),
+                TaskAction::TestStatus { id, status } => {
+                    cmd::task::cmd_test_status(s, id, &status)
+                }
+                TaskAction::Sprint => cmd::task::cmd_sprint(s),
+            })
         }
         Commands::State { action } => {
             cfg.require_module("state")?;
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
-            let (cmd_name, result) = match action {
+            let cmd_name = match &action {
+                StateAction::Set { .. } => "set",
+                StateAction::Get { .. } => "get",
+                StateAction::List { .. } => "list",
+                StateAction::Remove { .. } => "remove",
+                StateAction::Clear { .. } => "clear",
+            };
+            run_timed(&mut store, "state", cmd_name, |s| match action {
                 StateAction::Set {
                     category,
                     key,
                     value,
                 } => {
-                    let val = value.join(" ");
-                    if val.is_empty() {
-                        return Err("usage: beu state set --category <C> <key> <value>".into());
-                    }
-                    (
-                        "set",
-                        cmd::state::cmd_set(&mut store, &category, &key, &val),
-                    )
+                    let val =
+                        require_message(value, "beu state set --category <C> <key> <value>")?;
+                    cmd::state::cmd_set(s, &category, &key, &val)
                 }
-                StateAction::Get { key } => {
-                    ("get", cmd::state::cmd_get(&mut store, key.as_deref()))
+                StateAction::Get { key } => cmd::state::cmd_get(s, key.as_deref()),
+                StateAction::List { category } => {
+                    cmd::state::cmd_list(s, category.as_deref())
                 }
-                StateAction::List { category } => (
-                    "list",
-                    cmd::state::cmd_list(&mut store, category.as_deref()),
-                ),
-                StateAction::Remove { key } => ("remove", cmd::state::cmd_remove(&mut store, &key)),
+                StateAction::Remove { key } => cmd::state::cmd_remove(s, &key),
                 StateAction::Clear { category, force } => {
-                    ("clear", cmd::state::cmd_clear(&mut store, &category, force))
+                    cmd::state::cmd_clear(s, &category, force)
                 }
-            };
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "state", cmd_name, status, duration_ms);
-            result
+            })
         }
         Commands::Idea { action } => {
             cfg.require_module("idea")?;
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
-            let (cmd_name, result) = match action {
+            let cmd_name = match &action {
+                IdeaAction::Add { .. } => "add",
+                IdeaAction::List { .. } => "list",
+                IdeaAction::Show { .. } => "show",
+                IdeaAction::Done { .. } => "done",
+                IdeaAction::Archive { .. } => "archive",
+                IdeaAction::Describe { .. } => "describe",
+            };
+            run_timed(&mut store, "idea", cmd_name, |s| match action {
                 IdeaAction::Add {
                     title,
                     area,
                     priority,
                 } => {
-                    let title_str = title.join(" ");
-                    if title_str.is_empty() {
-                        return Err("usage: beu idea add <title>".into());
-                    }
-                    (
-                        "add",
-                        cmd::idea::cmd_add(&mut store, &title_str, &area, &priority),
-                    )
+                    let title_str = require_message(title, "beu idea add <title>")?;
+                    cmd::idea::cmd_add(s, &title_str, &area, &priority)
                 }
-                IdeaAction::List { area, status } => (
-                    "list",
-                    cmd::idea::cmd_list(&mut store, area.as_deref(), status.as_deref()),
-                ),
-                IdeaAction::Show { id } => ("show", cmd::idea::cmd_show(&mut store, id)),
-                IdeaAction::Done { id } => ("done", cmd::idea::cmd_done(&mut store, id)),
-                IdeaAction::Archive { id } => ("archive", cmd::idea::cmd_archive(&mut store, id)),
+                IdeaAction::List { area, status } => {
+                    cmd::idea::cmd_list(s, area.as_deref(), status.as_deref())
+                }
+                IdeaAction::Show { id } => cmd::idea::cmd_show(s, id),
+                IdeaAction::Done { id } => cmd::idea::cmd_done(s, id),
+                IdeaAction::Archive { id } => cmd::idea::cmd_archive(s, id),
                 IdeaAction::Describe { id, description } => {
-                    let desc = description.join(" ");
-                    if desc.is_empty() {
-                        return Err("usage: beu idea describe <id> <description>".into());
-                    }
-                    ("describe", cmd::idea::cmd_describe(&mut store, id, &desc))
+                    let desc =
+                        require_message(description, "beu idea describe <id> <description>")?;
+                    cmd::idea::cmd_describe(s, id, &desc)
                 }
-            };
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "idea", cmd_name, status, duration_ms);
-            result
+            })
         }
         Commands::Debug { action } => {
             cfg.require_module("debug")?;
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
-            let (cmd_name, result) = match action {
+            let cmd_name = match &action {
+                DebugAction::Open { .. } => "open",
+                DebugAction::Log { .. } => "log",
+                DebugAction::Symptom { .. } => "symptom",
+                DebugAction::Cause { .. } => "cause",
+                DebugAction::Resolve { .. } => "resolve",
+                DebugAction::List { .. } => "list",
+                DebugAction::Show { .. } => "show",
+            };
+            run_timed(&mut store, "debug", cmd_name, |s| match action {
                 DebugAction::Open { title } => {
-                    let title_str = title.join(" ");
-                    if title_str.is_empty() {
-                        return Err("usage: beu debug open <title>".into());
-                    }
-                    ("open", cmd::debug::cmd_open(&mut store, &title_str))
+                    let title_str = require_message(title, "beu debug open <title>")?;
+                    cmd::debug::cmd_open(s, &title_str)
                 }
                 DebugAction::Log { slug, message } => {
-                    let msg = message.join(" ");
-                    if msg.is_empty() {
-                        return Err("usage: beu debug log <slug> <message>".into());
-                    }
-                    ("log", cmd::debug::cmd_log(&mut store, &slug, &msg))
+                    let msg = require_message(message, "beu debug log <slug> <message>")?;
+                    cmd::debug::cmd_log(s, &slug, &msg)
                 }
                 DebugAction::Symptom { slug, description } => {
-                    let desc = description.join(" ");
-                    if desc.is_empty() {
-                        return Err("usage: beu debug symptom <slug> <description>".into());
-                    }
-                    ("symptom", cmd::debug::cmd_symptom(&mut store, &slug, &desc))
+                    let desc = require_message(
+                        description,
+                        "beu debug symptom <slug> <description>",
+                    )?;
+                    cmd::debug::cmd_symptom(s, &slug, &desc)
                 }
                 DebugAction::Cause { slug, description } => {
-                    let desc = description.join(" ");
-                    if desc.is_empty() {
-                        return Err("usage: beu debug cause <slug> <description>".into());
-                    }
-                    ("cause", cmd::debug::cmd_cause(&mut store, &slug, &desc))
+                    let desc = require_message(
+                        description,
+                        "beu debug cause <slug> <description>",
+                    )?;
+                    cmd::debug::cmd_cause(s, &slug, &desc)
                 }
-                DebugAction::Resolve { slug } => {
-                    ("resolve", cmd::debug::cmd_resolve(&mut store, &slug))
-                }
+                DebugAction::Resolve { slug } => cmd::debug::cmd_resolve(s, &slug),
                 DebugAction::List { status } => {
-                    ("list", cmd::debug::cmd_list(&mut store, status.as_deref()))
+                    cmd::debug::cmd_list(s, status.as_deref())
                 }
-                DebugAction::Show { slug } => ("show", cmd::debug::cmd_show(&mut store, &slug)),
-            };
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "debug", cmd_name, status, duration_ms);
-            result
+                DebugAction::Show { slug } => cmd::debug::cmd_show(s, &slug),
+            })
         }
         Commands::Pause { message } => {
             cfg.require_module("state")?;
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
             let msg = message.join(" ");
-            let result =
-                cmd::system::cmd_pause(&mut store, if msg.is_empty() { None } else { Some(&msg) });
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "system", "pause", status, duration_ms);
-            result
+            run_timed(&mut store, "system", "pause", |s| {
+                cmd::system::cmd_pause(s, if msg.is_empty() { None } else { Some(&msg) })
+            })
         }
         Commands::Resume => {
             cfg.require_module("state")?;
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
-            let result = cmd::system::cmd_resume(&mut store);
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "system", "resume", status, duration_ms);
-            result
+            run_timed(&mut store, "system", "resume", |s| {
+                cmd::system::cmd_resume(s)
+            })
         }
-        Commands::Progress => {
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
-            let result = cmd::system::cmd_progress(&mut store, cfg);
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "system", "progress", status, duration_ms);
-            result
-        }
-        Commands::Health { repair } => {
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-
-            let start = std::time::Instant::now();
-            let result = cmd::system::cmd_health(&mut store, repair);
-
-            let duration_ms = start.elapsed().as_millis() as i64;
-            let status = if result.is_ok() { "ok" } else { "error" };
-            cmd::system::log_event(&mut store, "system", "health", status, duration_ms);
-            result
-        }
-        Commands::Status => {
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-            cmd::system::cmd_status(&mut store, cfg)
-        }
-        Commands::Check => {
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
-            cmd::system::cmd_check(&mut store, cfg)
-        }
+        Commands::Progress => run_timed(&mut store, "system", "progress", |s| {
+            cmd::system::cmd_progress(s, cfg)
+        }),
+        Commands::Health { repair } => run_timed(&mut store, "system", "health", |s| {
+            cmd::system::cmd_health(s, repair)
+        }),
+        Commands::Status => cmd::system::cmd_status(&mut store, cfg),
+        Commands::Check => cmd::system::cmd_check(&mut store, cfg),
         Commands::Events { limit, module } => {
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
             cmd::system::cmd_events(&mut store, limit, module.as_deref())
         }
         Commands::Export { module, all } => {
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
             cmd::system::cmd_export(&mut store, module.as_deref(), all)
         }
         Commands::Import { module, file } => {
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
             cmd::system::cmd_import(&mut store, &module, &file, quiet)
         }
         Commands::Reset { module, force } => {
-            let mut store = sqlite::SqliteStore::open(beu_dir, project_id)?;
             cmd::system::cmd_reset(&mut store, &module, force, quiet)
         }
         // Init, Project, Version, Test are handled in run() before reaching here.
@@ -873,6 +806,18 @@ fn run_with_project(
         | Commands::UpdateRules
         | Commands::Test { .. } => unreachable!(),
     }
+}
+
+/// Join a Vec<String> into a non-empty message, or return a usage error.
+fn require_message(
+    words: Vec<String>,
+    usage: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let msg = words.join(" ");
+    if msg.is_empty() {
+        return Err(format!("usage: {usage}").into());
+    }
+    Ok(msg)
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 pub fn utc_now() -> String {
     let dur = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
+        .expect("system clock is before UNIX epoch");
     let secs = dur.as_secs();
     let millis = dur.subsec_millis();
     let days = secs / 86400;
@@ -18,17 +18,23 @@ pub fn utc_now() -> String {
     format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}.{millis:03}Z")
 }
 
-/// Generate a unique ID using FNV hash of timestamp + atomic counter.
-/// Returns a prefixed hex string like "j-a1b2c3" (6 hex digits).
+/// Generate a unique ID using FNV hash of timestamp + atomic counter + PID.
+/// Returns a prefixed hex string like "j-a1b2c3d4e5f6" (12 hex digits / 48 bits).
 pub fn generate_id(prefix: &str) -> String {
     let ts = utc_now();
     let counter = ID_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
+    let pid = std::process::id();
     let mut h: u64 = 0xcbf29ce484222325;
-    for byte in ts.as_bytes().iter().chain(&counter.to_le_bytes()) {
+    for byte in ts
+        .as_bytes()
+        .iter()
+        .chain(&counter.to_le_bytes())
+        .chain(&pid.to_le_bytes())
+    {
         h ^= *byte as u64;
         h = h.wrapping_mul(0x100000001b3);
     }
-    format!("{prefix}-{h:06x}", h = h & 0xFFFFFF)
+    format!("{prefix}-{h:012x}", h = h & 0xFFFFFFFFFFFF)
 }
 
 fn days_to_ymd(days: u64) -> (u64, u64, u64) {
@@ -62,7 +68,7 @@ mod tests {
     fn generate_id_has_prefix() {
         let id = generate_id("j");
         assert!(id.starts_with("j-"));
-        assert_eq!(id.len(), 2 + 6); // prefix + dash + 6 hex chars
+        assert_eq!(id.len(), 2 + 12); // prefix + dash + 12 hex chars
     }
 
     #[test]
