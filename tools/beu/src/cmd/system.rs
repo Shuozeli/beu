@@ -273,10 +273,7 @@ pub fn cmd_reset(
 // Health
 // ---------------------------------------------------------------------------
 
-pub fn cmd_health(
-    store: &mut SqliteStore,
-    repair: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn cmd_health(store: &mut SqliteStore, repair: bool) -> Result<(), Box<dyn std::error::Error>> {
     if repair {
         eprintln!("warning: --repair is not yet implemented");
     }

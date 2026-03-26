@@ -81,16 +81,20 @@ pub fn cmd_update(
 
     if let Some(s) = new_status {
         if !VALID_STATUSES.contains(&s) {
-            return Err(
-                format!("invalid status '{s}' (valid: {})", VALID_STATUSES.join(", ")).into(),
-            );
+            return Err(format!(
+                "invalid status '{s}' (valid: {})",
+                VALID_STATUSES.join(", ")
+            )
+            .into());
         }
     }
     if let Some(p) = new_priority {
         if !VALID_PRIORITIES.contains(&p) {
-            return Err(
-                format!("invalid priority '{p}' (valid: {})", VALID_PRIORITIES.join(", ")).into(),
-            );
+            return Err(format!(
+                "invalid priority '{p}' (valid: {})",
+                VALID_PRIORITIES.join(", ")
+            )
+            .into());
         }
     }
 

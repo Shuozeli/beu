@@ -561,12 +561,11 @@ fn run_with_project(
             run_timed(&mut store, "journal", cmd_name, |s| match action {
                 JournalAction::Open => cmd::journal::cmd_open(s),
                 JournalAction::Log { message } => {
-                    let msg = require_message(message, "beu journal log <message>")?;
+                    let msg = require_message(&message, "beu journal log <message>")?;
                     cmd::journal::cmd_log(s, &msg)
                 }
                 JournalAction::Note { tag, message } => {
-                    let msg =
-                        require_message(message, "beu journal note --tag <tag> <message>")?;
+                    let msg = require_message(&message, "beu journal note --tag <tag> <message>")?;
                     cmd::journal::cmd_note(s, &tag, &msg)
                 }
                 JournalAction::Summary => cmd::journal::cmd_summary(s),
@@ -594,21 +593,18 @@ fn run_with_project(
                 ArtifactAction::Status { name, status } => {
                     cmd::artifact::cmd_status(s, &name, &status)
                 }
-                ArtifactAction::List { filter } => {
-                    cmd::artifact::cmd_list(s, filter.as_deref())
-                }
+                ArtifactAction::List { filter } => cmd::artifact::cmd_list(s, filter.as_deref()),
                 ArtifactAction::Show { name } => cmd::artifact::cmd_show(s, &name),
                 ArtifactAction::Describe { name, description } => {
                     let desc = require_message(
-                        description,
+                        &description,
                         "beu artifact describe <name> <description>",
                     )?;
                     cmd::artifact::cmd_describe(s, &name, &desc)
                 }
                 ArtifactAction::Remove { name } => cmd::artifact::cmd_remove(s, &name),
                 ArtifactAction::Changelog { name, message } => {
-                    let msg =
-                        require_message(message, "beu artifact changelog <name> <message>")?;
+                    let msg = require_message(&message, "beu artifact changelog <name> <message>")?;
                     cmd::artifact::cmd_changelog(s, &name, &msg)
                 }
                 ArtifactAction::History { name } => cmd::artifact::cmd_history(s, &name),
@@ -631,7 +627,7 @@ fn run_with_project(
                     priority,
                     tag,
                 } => {
-                    let title_str = require_message(title, "beu task add <title>")?;
+                    let title_str = require_message(&title, "beu task add <title>")?;
                     cmd::task::cmd_add(s, &title_str, &priority, tag.as_deref())
                 }
                 TaskAction::List {
@@ -658,9 +654,7 @@ fn run_with_project(
                 ),
                 TaskAction::Done { id } => cmd::task::cmd_done(s, id),
                 TaskAction::Show { id } => cmd::task::cmd_show(s, id),
-                TaskAction::TestStatus { id, status } => {
-                    cmd::task::cmd_test_status(s, id, &status)
-                }
+                TaskAction::TestStatus { id, status } => cmd::task::cmd_test_status(s, id, &status),
                 TaskAction::Sprint => cmd::task::cmd_sprint(s),
             })
         }
@@ -680,13 +674,11 @@ fn run_with_project(
                     value,
                 } => {
                     let val =
-                        require_message(value, "beu state set --category <C> <key> <value>")?;
+                        require_message(&value, "beu state set --category <C> <key> <value>")?;
                     cmd::state::cmd_set(s, &category, &key, &val)
                 }
                 StateAction::Get { key } => cmd::state::cmd_get(s, key.as_deref()),
-                StateAction::List { category } => {
-                    cmd::state::cmd_list(s, category.as_deref())
-                }
+                StateAction::List { category } => cmd::state::cmd_list(s, category.as_deref()),
                 StateAction::Remove { key } => cmd::state::cmd_remove(s, &key),
                 StateAction::Clear { category, force } => {
                     cmd::state::cmd_clear(s, &category, force)
@@ -709,7 +701,7 @@ fn run_with_project(
                     area,
                     priority,
                 } => {
-                    let title_str = require_message(title, "beu idea add <title>")?;
+                    let title_str = require_message(&title, "beu idea add <title>")?;
                     cmd::idea::cmd_add(s, &title_str, &area, &priority)
                 }
                 IdeaAction::List { area, status } => {
@@ -720,7 +712,7 @@ fn run_with_project(
                 IdeaAction::Archive { id } => cmd::idea::cmd_archive(s, id),
                 IdeaAction::Describe { id, description } => {
                     let desc =
-                        require_message(description, "beu idea describe <id> <description>")?;
+                        require_message(&description, "beu idea describe <id> <description>")?;
                     cmd::idea::cmd_describe(s, id, &desc)
                 }
             })
@@ -738,31 +730,25 @@ fn run_with_project(
             };
             run_timed(&mut store, "debug", cmd_name, |s| match action {
                 DebugAction::Open { title } => {
-                    let title_str = require_message(title, "beu debug open <title>")?;
+                    let title_str = require_message(&title, "beu debug open <title>")?;
                     cmd::debug::cmd_open(s, &title_str)
                 }
                 DebugAction::Log { slug, message } => {
-                    let msg = require_message(message, "beu debug log <slug> <message>")?;
+                    let msg = require_message(&message, "beu debug log <slug> <message>")?;
                     cmd::debug::cmd_log(s, &slug, &msg)
                 }
                 DebugAction::Symptom { slug, description } => {
-                    let desc = require_message(
-                        description,
-                        "beu debug symptom <slug> <description>",
-                    )?;
+                    let desc =
+                        require_message(&description, "beu debug symptom <slug> <description>")?;
                     cmd::debug::cmd_symptom(s, &slug, &desc)
                 }
                 DebugAction::Cause { slug, description } => {
-                    let desc = require_message(
-                        description,
-                        "beu debug cause <slug> <description>",
-                    )?;
+                    let desc =
+                        require_message(&description, "beu debug cause <slug> <description>")?;
                     cmd::debug::cmd_cause(s, &slug, &desc)
                 }
                 DebugAction::Resolve { slug } => cmd::debug::cmd_resolve(s, &slug),
-                DebugAction::List { status } => {
-                    cmd::debug::cmd_list(s, status.as_deref())
-                }
+                DebugAction::List { status } => cmd::debug::cmd_list(s, status.as_deref()),
                 DebugAction::Show { slug } => cmd::debug::cmd_show(s, &slug),
             })
         }
@@ -808,11 +794,8 @@ fn run_with_project(
     }
 }
 
-/// Join a Vec<String> into a non-empty message, or return a usage error.
-fn require_message(
-    words: Vec<String>,
-    usage: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
+/// Join a slice of strings into a non-empty message, or return a usage error.
+fn require_message(words: &[String], usage: &str) -> Result<String, Box<dyn std::error::Error>> {
     let msg = words.join(" ");
     if msg.is_empty() {
         return Err(format!("usage: {usage}").into());

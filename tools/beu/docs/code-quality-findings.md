@@ -2,6 +2,7 @@
 
 Audit date: 2026-03-26
 Fix pass: 2026-03-26
+Re-audit date: 2026-03-26
 
 ## 1. Stringly-Typed APIs (Missing Enums)
 
@@ -82,6 +83,15 @@ Fix pass: 2026-03-26
 ### 6.2 Redundant `let result = { ... }; result` Pattern
 - **Status: SKIPPED** -- Low priority. The pattern is idiomatic for rusqlite borrow management.
 
+### 6.3 Clippy: `require_message` Takes `Vec<String>` by Value
+- **Status: FIXED** -- Changed `require_message(words: Vec<String>, ...)` to `require_message(words: &[String], ...)` to avoid needless ownership transfer. Updated all 9 call sites.
+- **Location:** `src/main.rs:811-821`
+- **Problem:** clippy::needless_pass_by_value flagged that the function joins the strings without consuming them, so a slice reference suffices.
+
+### 6.4 Clippy: Manual `let...else` Patterns
+- **Status: FIXED** -- Converted two match-to-early-return patterns to idiomatic `let...else` syntax.
+- **Location:** `src/cmd/project.rs:115-118` (SqliteStore open_readonly), `src/sqlite/mod.rs:192-195` (import table row iteration)
+
 ## 7. Error Handling
 
 ### 7.1 Box<dyn Error> Used Throughout Instead of a Project Error Type
@@ -99,3 +109,19 @@ Fix pass: 2026-03-26
 
 ### 8.2 No Input Sanitization on User-Provided Strings
 - **Status: SKIPPED** -- Low priority. The tool is used by agents and developers, not adversarial users.
+
+## Summary
+
+| Category | Total | Done | Skipped |
+|---|---|---|---|
+| Stringly-Typed APIs | 2 | 1 | 1 |
+| Duplication | 4 | 2 | 2 |
+| Missing Abstractions | 2 | 0 | 2 |
+| Unused / Dead Code | 3 | 1 | 2 |
+| Unsafe Patterns | 3 | 3 | 0 |
+| Code Style | 4 | 2 | 2 |
+| Error Handling | 2 | 1.5 | 0.5 |
+| Potential Improvements | 2 | 0 | 2 |
+| **Total** | **22** | **10.5** | **11.5** |
+
+All findings marked DONE have been verified by `cargo test`, `cargo clippy`, and `cargo fmt`.

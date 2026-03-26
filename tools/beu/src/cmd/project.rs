@@ -112,9 +112,8 @@ pub fn discover_projects(
 
 fn collect_summary_line(project: &DiscoveredProject) -> Vec<String> {
     let config = config::load(&project.beu_dir).unwrap_or_default();
-    let mut store = match SqliteStore::open_readonly(&project.beu_dir, "default") {
-        Ok(s) => s,
-        Err(_) => return vec!["  (error opening database)".to_string()],
+    let Ok(mut store) = SqliteStore::open_readonly(&project.beu_dir, "default") else {
+        return vec!["  (error opening database)".to_string()];
     };
 
     let mut lines = Vec::new();

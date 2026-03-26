@@ -189,9 +189,8 @@ impl SqliteStore {
         // Import tables in the order defined by module_tables() (parent tables first)
         // to satisfy foreign key constraints.
         for table_name in known_tables {
-            let rows_val = match obj.get(*table_name) {
-                Some(v) => v,
-                None => continue,
+            let Some(rows_val) = obj.get(*table_name) else {
+                continue;
             };
             let rows = rows_val
                 .as_array()
